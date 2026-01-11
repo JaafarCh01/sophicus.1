@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Lead;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -15,11 +16,26 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // Create demo users (agents)
+        User::factory()->create([
+            'name' => 'John Doe',
+            'email' => 'john@sophicus.com',
+        ]);
 
         User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+            'name' => 'Sarah Martinez',
+            'email' => 'sarah@sophicus.com',
         ]);
+
+        User::factory()->create([
+            'name' => 'Miguel Rodriguez',
+            'email' => 'miguel@sophicus.com',
+        ]);
+
+        // Create leads with various states
+        Lead::factory(30)->create();
+        Lead::factory(10)->hot()->create();
+        Lead::factory(15)->freshLead()->create();
+        Lead::factory(5)->won()->create();
     }
 }
