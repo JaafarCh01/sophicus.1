@@ -1,26 +1,227 @@
 @import "tailwindcss";
 
+/* ============================================
+   SOPHICUS DESIGN SYSTEM
+   Premium Real Estate SaaS Platform
+   ============================================ */
+
+/* Color Palette */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand Colors */
+  --brand-primary: 99 102 241;    /* Indigo #6366f1 */
+  --brand-accent: 249 115 22;     /* Orange #f97316 */
+  
+  /* Semantic Colors */
+  --success: 16 185 129;          /* Emerald #10b981 */
+  --warning: 245 158 11;          /* Amber #f59e0b */
+  --danger: 239 68 68;            /* Red #ef4444 */
+  --info: 59 130 246;             /* Blue #3b82f6 */
+  
+  /* Light Theme */
+  --background: 250 250 250;
+  --foreground: 23 23 23;
+  --surface: 255 255 255;
+  --surface-elevated: 255 255 255;
+  --border: 229 231 235;
+  --muted: 107 114 128;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+/* Dark Theme */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 10 10 12;
+    --foreground: 237 237 237;
+    --surface: 22 22 26;
+    --surface-elevated: 30 30 35;
+    --border: 45 45 50;
+    --muted: 156 163 175;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Force Dark Mode (default for premium feel) */
+.dark {
+  --background: 10 10 12;
+  --foreground: 237 237 237;
+  --surface: 22 22 26;
+  --surface-elevated: 30 30 35;
+  --border: 45 45 50;
+  --muted: 156 163 175;
 }
+
+/* Theme Variables for Tailwind */
+@theme inline {
+  /* Colors */
+  --color-background: rgb(var(--background));
+  --color-foreground: rgb(var(--foreground));
+  --color-surface: rgb(var(--surface));
+  --color-surface-elevated: rgb(var(--surface-elevated));
+  --color-border: rgb(var(--border));
+  --color-muted: rgb(var(--muted));
+  --color-brand: rgb(var(--brand-primary));
+  --color-accent: rgb(var(--brand-accent));
+  --color-success: rgb(var(--success));
+  --color-warning: rgb(var(--warning));
+  --color-danger: rgb(var(--danger));
+  --color-info: rgb(var(--info));
+  
+  /* Typography */
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), 'JetBrains Mono', monospace;
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  
+  /* Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+}
+
+/* Base Styles */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: rgb(var(--background));
+  color: rgb(var(--foreground));
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Selection */
+::selection {
+  background: rgba(var(--brand-primary), 0.3);
+  color: rgb(var(--foreground));
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--muted));
+}
+
+/* Focus Styles */
+*:focus-visible {
+  outline: 2px solid rgb(var(--brand-primary));
+  outline-offset: 2px;
+}
+
+/* Glass Effect Utilities */
+.glass {
+  background: rgba(var(--surface), 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(var(--border), 0.5);
+}
+
+.glass-strong {
+  background: rgba(var(--surface), 0.9);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(var(--border), 0.7);
+}
+
+/* Gradient Utilities */
+.gradient-brand {
+  background: linear-gradient(135deg, rgb(var(--brand-primary)), rgb(var(--brand-accent)));
+}
+
+.gradient-subtle {
+  background: linear-gradient(180deg, 
+    rgba(var(--surface-elevated), 1) 0%, 
+    rgba(var(--surface), 1) 100%
+  );
+}
+
+.gradient-shine {
+  background: linear-gradient(
+    120deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+}
+
+/* Animation Utilities */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out;
+}
+
+.animate-pulse-soft {
+  animation: pulseSoft 2s infinite;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseSoft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Hover Card Effect */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.2);
+}
+
+/* Text Gradient */
+.text-gradient {
+  background: linear-gradient(135deg, rgb(var(--brand-primary)), rgb(var(--brand-accent)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Status Badge Colors */
+.status-new { background: rgba(var(--info), 0.15); color: rgb(var(--info)); }
+.status-contacted { background: rgba(var(--warning), 0.15); color: rgb(var(--warning)); }
+.status-qualified { background: rgba(var(--brand-primary), 0.15); color: rgb(var(--brand-primary)); }
+.status-won { background: rgba(var(--success), 0.15); color: rgb(var(--success)); }
+.status-lost { background: rgba(var(--danger), 0.15); color: rgb(var(--danger)); }
