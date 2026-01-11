@@ -1,0 +1,1 @@
+Hey, bro. So I'm doing everything from scratch again. So can you give me like the full plan, the problems we are solving for the real estate agencies and the solutions we are integrating into our dashboard and all that things we are going to solve for the real estate. So can you go, you know, walk through doing that and I'll give you, you know, yeah.
