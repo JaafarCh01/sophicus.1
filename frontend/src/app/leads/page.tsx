@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { PageHeader } from "@/components/layout/Header";
-import { Card, CardContent } from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { Avatar } from "@/components/ui/Avatar";
 import { StatusBadge, ScoreBadge, Badge } from "@/components/ui/Badge";
 import { StatCard } from "@/components/ui/StatCard";
+import { Modal, SlideOver, ModalInput, ModalSelect, ModalTextarea, ModalButton, ModalRow } from "@/components/ui/Modal";
 import { leadApi, type LeadFilters } from "@/lib/api";
 import { formatCurrency, formatRelativeTime, cn } from "@/lib/utils";
 import type { Lead } from "@/types";
@@ -21,13 +22,17 @@ import {
     Phone,
     Users,
     TrendingUp,
-    Clock,
     Flame,
     ChevronLeft,
     ChevronRight,
     X,
     MoreVertical,
     Eye,
+    Edit,
+    Trash2,
+    MessageSquare,
+    Calendar,
+    CheckCircle,
 } from "lucide-react";
 
 // Source icons mapping
@@ -57,6 +62,16 @@ export default function LeadsPage() {
     });
     const [showFilters, setShowFilters] = useState(false);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [newLead, setNewLead] = useState({
+        name: "",
+        email: "",
+        phone: "",
+        source: "website",
+        intent: "",
+        notes: "",
+    });
+    const [creating, setCreating] = useState(false);
 
     // Fetch leads
     const fetchLeads = useCallback(async () => {
@@ -108,30 +123,68 @@ export default function LeadsPage() {
         setShowFilters(false);
     };
 
+    // Create new lead
+    const handleCreateLead = async () => {
+        if (!newLead.name.trim()) return;
+
+        setCreating(true);
+        try {
+            await leadApi.createLead({
+                name: newLead.name,
+                email: newLead.email || undefined,
+                phone: newLead.phone || undefined,
+                source: newLead.source as Lead["source"],
+                intent: newLead.intent as Lead["intent"] || undefined,
+                notes: newLead.notes || undefined,
+            });
+            setShowAddModal(false);
+            setNewLead({ name: "", email: "", phone: "", source: "website", intent: "", notes: "" });
+            fetchLeads();
+            fetchStats();
+        } catch (error) {
+            console.error("Failed to create lead:", error);
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    // Update lead status
+    const handleUpdateStatus = async (lead: Lead, newStatus: string) => {
+        try {
+            await leadApi.updateLead(lead.id, { status: newStatus as Lead["status"] });
+            fetchLeads();
+            if (selectedLead?.id === lead.id) {
+                setSelectedLead({ ...selectedLead, status: newStatus as Lead["status"] });
+            }
+        } catch (error) {
+            console.error("Failed to update lead:", error);
+        }
+    };
+
+    // Delete lead
+    const handleDeleteLead = async (lead: Lead) => {
+        if (!confirm(`Are you sure you want to delete ${lead.name}?`)) return;
+
+        try {
+            await leadApi.deleteLead(lead.id);
+            fetchLeads();
+            fetchStats();
+            if (selectedLead?.id === lead.id) {
+                setSelectedLead(null);
+            }
+        } catch (error) {
+            console.error("Failed to delete lead:", error);
+        }
+    };
+
     return (
         <MainLayout title="Leads" subtitle={`${pagination?.total ?? 0} total leads`} showSearch>
             {/* Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <StatCard
-                    title="Total Leads"
-                    value={stats.total || 0}
-                    icon={Users}
-                />
-                <StatCard
-                    title="New This Month"
-                    value={stats.this_month || 0}
-                    icon={TrendingUp}
-                />
-                <StatCard
-                    title="Hot Leads"
-                    value={stats.hot_leads || 0}
-                    icon={Flame}
-                />
-                <StatCard
-                    title="Qualified"
-                    value={stats.qualified || 0}
-                    icon={Clock}
-                />
+                <StatCard title="Total Leads" value={stats.total || 0} icon={Users} />
+                <StatCard title="New This Month" value={stats.this_month || 0} icon={TrendingUp} />
+                <StatCard title="Hot Leads" value={stats.hot_leads || 0} icon={Flame} />
+                <StatCard title="Qualified" value={stats.qualified || 0} icon={CheckCircle} />
             </div>
 
             {/* Actions Bar */}
@@ -172,7 +225,9 @@ export default function LeadsPage() {
                     )}
                 </div>
 
-                <Button leftIcon={<Plus size={18} />}>Add Lead</Button>
+                <Button leftIcon={<Plus size={18} />} onClick={() => setShowAddModal(true)}>
+                    Add Lead
+                </Button>
             </div>
 
             {/* Filters Panel */}
@@ -186,89 +241,57 @@ export default function LeadsPage() {
                     >
                         <Card className="p-4">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {/* Status Filter */}
-                                <div>
-                                    <label className="block text-sm font-medium text-foreground mb-1.5">Status</label>
-                                    <select
-                                        value={filters.status || ""}
-                                        onChange={(e) => updateFilter("status", e.target.value || undefined)}
-                                        className={cn(
-                                            "w-full h-10 px-3 rounded-lg",
-                                            "bg-surface-elevated border border-border text-foreground",
-                                            "focus:outline-none focus:ring-2 focus:ring-brand"
-                                        )}
-                                    >
-                                        <option value="">All Statuses</option>
-                                        <option value="new">New</option>
-                                        <option value="contacted">Contacted</option>
-                                        <option value="qualified">Qualified</option>
-                                        <option value="negotiation">Negotiation</option>
-                                        <option value="won">Won</option>
-                                        <option value="lost">Lost</option>
-                                    </select>
-                                </div>
+                                <Select
+                                    label="Status"
+                                    value={filters.status || ""}
+                                    onChange={(e) => updateFilter("status", e.target.value || undefined)}
+                                >
+                                    <option value="">All Statuses</option>
+                                    <option value="new">New</option>
+                                    <option value="contacted">Contacted</option>
+                                    <option value="qualified">Qualified</option>
+                                    <option value="negotiation">Negotiation</option>
+                                    <option value="won">Won</option>
+                                    <option value="lost">Lost</option>
+                                </Select>
 
-                                {/* Source Filter */}
-                                <div>
-                                    <label className="block text-sm font-medium text-foreground mb-1.5">Source</label>
-                                    <select
-                                        value={filters.source || ""}
-                                        onChange={(e) => updateFilter("source", e.target.value || undefined)}
-                                        className={cn(
-                                            "w-full h-10 px-3 rounded-lg",
-                                            "bg-surface-elevated border border-border text-foreground",
-                                            "focus:outline-none focus:ring-2 focus:ring-brand"
-                                        )}
-                                    >
-                                        <option value="">All Sources</option>
-                                        <option value="whatsapp">WhatsApp</option>
-                                        <option value="instagram">Instagram</option>
-                                        <option value="tiktok">TikTok</option>
-                                        <option value="facebook">Facebook</option>
-                                        <option value="website">Website</option>
-                                        <option value="referral">Referral</option>
-                                        <option value="portal">Portal</option>
-                                    </select>
-                                </div>
+                                <Select
+                                    label="Source"
+                                    value={filters.source || ""}
+                                    onChange={(e) => updateFilter("source", e.target.value || undefined)}
+                                >
+                                    <option value="">All Sources</option>
+                                    <option value="whatsapp">WhatsApp</option>
+                                    <option value="instagram">Instagram</option>
+                                    <option value="tiktok">TikTok</option>
+                                    <option value="facebook">Facebook</option>
+                                    <option value="website">Website</option>
+                                    <option value="referral">Referral</option>
+                                    <option value="portal">Portal</option>
+                                </Select>
 
-                                {/* Intent Filter */}
-                                <div>
-                                    <label className="block text-sm font-medium text-foreground mb-1.5">Intent</label>
-                                    <select
-                                        value={filters.intent || ""}
-                                        onChange={(e) => updateFilter("intent", e.target.value || undefined)}
-                                        className={cn(
-                                            "w-full h-10 px-3 rounded-lg",
-                                            "bg-surface-elevated border border-border text-foreground",
-                                            "focus:outline-none focus:ring-2 focus:ring-brand"
-                                        )}
-                                    >
-                                        <option value="">All Intents</option>
-                                        <option value="investor">Investor</option>
-                                        <option value="end_buyer">End Buyer</option>
-                                        <option value="renter">Renter</option>
-                                        <option value="developer">Developer</option>
-                                    </select>
-                                </div>
+                                <Select
+                                    label="Intent"
+                                    value={filters.intent || ""}
+                                    onChange={(e) => updateFilter("intent", e.target.value || undefined)}
+                                >
+                                    <option value="">All Intents</option>
+                                    <option value="investor">Investor</option>
+                                    <option value="end_buyer">End Buyer</option>
+                                    <option value="renter">Renter</option>
+                                    <option value="developer">Developer</option>
+                                </Select>
 
-                                {/* Min Score Filter */}
-                                <div>
-                                    <label className="block text-sm font-medium text-foreground mb-1.5">Min Score</label>
-                                    <select
-                                        value={filters.min_score || ""}
-                                        onChange={(e) => updateFilter("min_score", e.target.value ? Number(e.target.value) : undefined)}
-                                        className={cn(
-                                            "w-full h-10 px-3 rounded-lg",
-                                            "bg-surface-elevated border border-border text-foreground",
-                                            "focus:outline-none focus:ring-2 focus:ring-brand"
-                                        )}
-                                    >
-                                        <option value="">Any Score</option>
-                                        <option value="80">80+ (Hot)</option>
-                                        <option value="60">60+</option>
-                                        <option value="40">40+</option>
-                                    </select>
-                                </div>
+                                <Select
+                                    label="Min Score"
+                                    value={filters.min_score?.toString() || ""}
+                                    onChange={(e) => updateFilter("min_score", e.target.value ? Number(e.target.value) : undefined)}
+                                >
+                                    <option value="">Any Score</option>
+                                    <option value="80">80+ (Hot)</option>
+                                    <option value="60">60+</option>
+                                    <option value="40">40+</option>
+                                </Select>
                             </div>
                         </Card>
                     </motion.div>
@@ -292,7 +315,6 @@ export default function LeadsPage() {
                         </thead>
                         <tbody>
                             {loading ? (
-                                // Loading skeleton
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <tr key={i} className="border-b border-border animate-pulse">
                                         <td className="px-4 py-4">
@@ -309,7 +331,7 @@ export default function LeadsPage() {
                                         <td className="px-4 py-4"><div className="w-8 h-6 bg-border rounded" /></td>
                                         <td className="px-4 py-4"><div className="w-24 h-4 bg-border rounded" /></td>
                                         <td className="px-4 py-4"><div className="w-16 h-4 bg-border rounded" /></td>
-                                        <td className="px-4 py-4"><div className="w-8 h-4 bg-border rounded ml-auto" /></td>
+                                        <td className="px-4 py-4"><div className="w-20 h-4 bg-border rounded ml-auto" /></td>
                                     </tr>
                                 ))
                             ) : leads.length === 0 ? (
@@ -320,14 +342,10 @@ export default function LeadsPage() {
                                 </tr>
                             ) : (
                                 leads.map((lead) => (
-                                    <motion.tr
+                                    <tr
                                         key={lead.id}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="border-b border-border hover:bg-surface-elevated/50 transition-colors cursor-pointer"
-                                        onClick={() => setSelectedLead(lead)}
+                                        className="border-b border-border hover:bg-surface-elevated/50 transition-colors"
                                     >
-                                        {/* Lead Info */}
                                         <td className="px-4 py-4">
                                             <div className="flex items-center gap-3">
                                                 <Avatar name={lead.name} size="md" />
@@ -344,26 +362,18 @@ export default function LeadsPage() {
                                                 </div>
                                             </div>
                                         </td>
-
-                                        {/* Source */}
                                         <td className="px-4 py-4">
                                             <span className="inline-flex items-center gap-1.5 text-sm">
                                                 <span>{sourceIcons[lead.source] || "🔗"}</span>
                                                 <span className="capitalize">{lead.source.replace("_", " ")}</span>
                                             </span>
                                         </td>
-
-                                        {/* Status */}
                                         <td className="px-4 py-4">
                                             <StatusBadge status={lead.status} />
                                         </td>
-
-                                        {/* Score */}
                                         <td className="px-4 py-4">
                                             <ScoreBadge score={lead.score} />
                                         </td>
-
-                                        {/* Budget */}
                                         <td className="px-4 py-4 text-sm text-foreground">
                                             {lead.budget_min && lead.budget_max ? (
                                                 <span>
@@ -373,30 +383,35 @@ export default function LeadsPage() {
                                                 <span className="text-muted">Not specified</span>
                                             )}
                                         </td>
-
-                                        {/* Created */}
                                         <td className="px-4 py-4 text-sm text-muted">
                                             {formatRelativeTime(lead.created_at)}
                                         </td>
-
-                                        {/* Actions */}
                                         <td className="px-4 py-4">
-                                            <div className="flex items-center justify-end gap-2">
+                                            <div className="flex items-center justify-end gap-1">
                                                 <button
                                                     className="p-2 rounded-lg hover:bg-surface-elevated text-muted hover:text-foreground transition-colors"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSelectedLead(lead);
-                                                    }}
+                                                    onClick={() => setSelectedLead(lead)}
+                                                    title="View details"
                                                 >
                                                     <Eye size={16} />
                                                 </button>
-                                                <button className="p-2 rounded-lg hover:bg-surface-elevated text-muted hover:text-foreground transition-colors">
-                                                    <MoreVertical size={16} />
+                                                <button
+                                                    className="p-2 rounded-lg hover:bg-surface-elevated text-muted hover:text-brand transition-colors"
+                                                    onClick={() => setSelectedLead(lead)}
+                                                    title="Edit"
+                                                >
+                                                    <Edit size={16} />
+                                                </button>
+                                                <button
+                                                    className="p-2 rounded-lg hover:bg-surface-elevated text-muted hover:text-danger transition-colors"
+                                                    onClick={() => handleDeleteLead(lead)}
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 size={16} />
                                                 </button>
                                             </div>
                                         </td>
-                                    </motion.tr>
+                                    </tr>
                                 ))
                             )}
                         </tbody>
@@ -438,124 +453,249 @@ export default function LeadsPage() {
                 )}
             </Card>
 
-            {/* Lead Detail Slide-over (placeholder) */}
-            <AnimatePresence>
-                {selectedLead && (
-                    <>
-                        {/* Backdrop */}
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-black/50 z-40"
-                            onClick={() => setSelectedLead(null)}
+            {/* Add Lead Modal */}
+            <Modal
+                isOpen={showAddModal}
+                onClose={() => setShowAddModal(false)}
+                title="Add New Lead"
+                description="Enter the lead's information below."
+                size="lg"
+            >
+                <div>
+                    <ModalInput
+                        label="Name *"
+                        placeholder="Enter lead name"
+                        value={newLead.name}
+                        onChange={(e) => setNewLead({ ...newLead, name: e.target.value })}
+                    />
+                    <ModalRow>
+                        <ModalInput
+                            label="Email"
+                            type="email"
+                            placeholder="email@example.com"
+                            value={newLead.email}
+                            onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
                         />
-
-                        {/* Panel */}
-                        <motion.div
-                            initial={{ x: "100%" }}
-                            animate={{ x: 0 }}
-                            exit={{ x: "100%" }}
-                            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                            className="fixed right-0 top-0 h-screen w-full max-w-lg bg-surface border-l border-border z-50 overflow-y-auto"
+                        <ModalInput
+                            label="Phone"
+                            placeholder="+1 234 567 8900"
+                            value={newLead.phone}
+                            onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
+                        />
+                    </ModalRow>
+                    <ModalRow>
+                        <ModalSelect
+                            label="Source"
+                            value={newLead.source}
+                            onChange={(e) => setNewLead({ ...newLead, source: e.target.value })}
                         >
-                            <div className="p-6">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-xl font-semibold text-foreground">Lead Details</h2>
-                                    <button
-                                        onClick={() => setSelectedLead(null)}
-                                        className="p-2 rounded-lg hover:bg-surface-elevated text-muted hover:text-foreground"
-                                    >
-                                        <X size={20} />
-                                    </button>
+                            <option value="website">Website</option>
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="instagram">Instagram</option>
+                            <option value="tiktok">TikTok</option>
+                            <option value="facebook">Facebook</option>
+                            <option value="referral">Referral</option>
+                            <option value="portal">Portal</option>
+                            <option value="cold_outreach">Cold Outreach</option>
+                        </ModalSelect>
+                        <ModalSelect
+                            label="Intent"
+                            value={newLead.intent}
+                            onChange={(e) => setNewLead({ ...newLead, intent: e.target.value })}
+                        >
+                            <option value="">Select intent</option>
+                            <option value="investor">Investor</option>
+                            <option value="end_buyer">End Buyer</option>
+                            <option value="renter">Renter</option>
+                            <option value="developer">Developer</option>
+                        </ModalSelect>
+                    </ModalRow>
+                    <ModalTextarea
+                        label="Notes"
+                        placeholder="Add any notes about this lead..."
+                        value={newLead.notes}
+                        onChange={(e) => setNewLead({ ...newLead, notes: e.target.value })}
+                    />
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, paddingTop: 16, borderTop: "1px solid #2d2d32" }}>
+                        <ModalButton variant="secondary" onClick={() => setShowAddModal(false)}>
+                            Cancel
+                        </ModalButton>
+                        <ModalButton
+                            onClick={handleCreateLead}
+                            disabled={!newLead.name.trim() || creating}
+                        >
+                            {creating ? "Creating..." : "Create Lead"}
+                        </ModalButton>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Lead Detail SlideOver */}
+            <SlideOver
+                isOpen={!!selectedLead}
+                onClose={() => setSelectedLead(null)}
+                title="Lead Details"
+                width="lg"
+            >
+                {selectedLead && (
+                    <div className="space-y-4">
+                        {/* Lead Header */}
+                        <div className="flex items-center gap-4 pb-4 border-b border-border">
+                            <Avatar name={selectedLead.name} size="xl" />
+                            <div className="flex-1">
+                                <h3 className="text-lg font-semibold text-foreground">{selectedLead.name}</h3>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <StatusBadge status={selectedLead.status} />
+                                    <ScoreBadge score={selectedLead.score} />
                                 </div>
+                            </div>
+                        </div>
 
-                                {/* Lead Header */}
-                                <div className="flex items-center gap-4 mb-6">
-                                    <Avatar name={selectedLead.name} size="xl" />
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-foreground">{selectedLead.name}</h3>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <StatusBadge status={selectedLead.status} />
-                                            <ScoreBadge score={selectedLead.score} />
-                                        </div>
+                        {/* Quick Actions */}
+                        <div className="flex gap-2">
+                            {selectedLead.email && (
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    leftIcon={<Mail size={16} />}
+                                    onClick={() => window.open(`mailto:${selectedLead.email}`)}
+                                >
+                                    Email
+                                </Button>
+                            )}
+                            {selectedLead.phone && (
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    leftIcon={<Phone size={16} />}
+                                    onClick={() => window.open(`tel:${selectedLead.phone}`)}
+                                >
+                                    Call
+                                </Button>
+                            )}
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                leftIcon={<MessageSquare size={16} />}
+                            >
+                                Message
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                leftIcon={<Calendar size={16} />}
+                            >
+                                Schedule
+                            </Button>
+                        </div>
+
+                        {/* Contact Info */}
+                        <Card>
+                            <h4 className="font-medium text-foreground mb-3">Contact Information</h4>
+                            <div className="space-y-2 text-sm">
+                                {selectedLead.email && (
+                                    <div className="flex items-center gap-2 text-muted">
+                                        <Mail size={14} />
+                                        <a href={`mailto:${selectedLead.email}`} className="text-brand hover:underline">
+                                            {selectedLead.email}
+                                        </a>
                                     </div>
-                                </div>
-
-                                {/* Contact Info */}
-                                <Card className="mb-4">
-                                    <h4 className="font-medium text-foreground mb-3">Contact Information</h4>
-                                    <div className="space-y-2 text-sm">
-                                        {selectedLead.email && (
-                                            <div className="flex items-center gap-2 text-muted">
-                                                <Mail size={14} />
-                                                <a href={`mailto:${selectedLead.email}`} className="text-brand hover:underline">
-                                                    {selectedLead.email}
-                                                </a>
-                                            </div>
-                                        )}
-                                        {selectedLead.phone && (
-                                            <div className="flex items-center gap-2 text-muted">
-                                                <Phone size={14} />
-                                                <a href={`tel:${selectedLead.phone}`} className="text-brand hover:underline">
-                                                    {selectedLead.phone}
-                                                </a>
-                                            </div>
-                                        )}
-                                    </div>
-                                </Card>
-
-                                {/* Details */}
-                                <Card className="mb-4">
-                                    <h4 className="font-medium text-foreground mb-3">Lead Details</h4>
-                                    <dl className="space-y-2 text-sm">
-                                        <div className="flex justify-between">
-                                            <dt className="text-muted">Source</dt>
-                                            <dd className="text-foreground capitalize">{selectedLead.source.replace("_", " ")}</dd>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <dt className="text-muted">Intent</dt>
-                                            <dd className="text-foreground capitalize">{selectedLead.intent?.replace("_", " ") || "Not specified"}</dd>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <dt className="text-muted">Budget</dt>
-                                            <dd className="text-foreground">
-                                                {selectedLead.budget_min && selectedLead.budget_max
-                                                    ? `${formatCurrency(Number(selectedLead.budget_min))} - ${formatCurrency(Number(selectedLead.budget_max))}`
-                                                    : "Not specified"}
-                                            </dd>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <dt className="text-muted">Created</dt>
-                                            <dd className="text-foreground">{new Date(selectedLead.created_at).toLocaleDateString()}</dd>
-                                        </div>
-                                    </dl>
-                                </Card>
-
-                                {/* Tags */}
-                                {selectedLead.tags && selectedLead.tags.length > 0 && (
-                                    <Card className="mb-4">
-                                        <h4 className="font-medium text-foreground mb-3">Tags</h4>
-                                        <div className="flex flex-wrap gap-2">
-                                            {selectedLead.tags.map((tag, i) => (
-                                                <Badge key={i} variant="brand">{tag}</Badge>
-                                            ))}
-                                        </div>
-                                    </Card>
                                 )}
-
-                                {/* Notes */}
-                                {selectedLead.notes && (
-                                    <Card>
-                                        <h4 className="font-medium text-foreground mb-3">Notes</h4>
-                                        <p className="text-sm text-muted">{selectedLead.notes}</p>
-                                    </Card>
+                                {selectedLead.phone && (
+                                    <div className="flex items-center gap-2 text-muted">
+                                        <Phone size={14} />
+                                        <a href={`tel:${selectedLead.phone}`} className="text-brand hover:underline">
+                                            {selectedLead.phone}
+                                        </a>
+                                    </div>
                                 )}
                             </div>
-                        </motion.div>
-                    </>
+                        </Card>
+
+                        {/* Lead Details */}
+                        <Card>
+                            <h4 className="font-medium text-foreground mb-3">Lead Details</h4>
+                            <dl className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <dt className="text-muted">Source</dt>
+                                    <dd className="text-foreground capitalize">{selectedLead.source.replace("_", " ")}</dd>
+                                </div>
+                                <div className="flex justify-between">
+                                    <dt className="text-muted">Intent</dt>
+                                    <dd className="text-foreground capitalize">{selectedLead.intent?.replace("_", " ") || "Not specified"}</dd>
+                                </div>
+                                <div className="flex justify-between">
+                                    <dt className="text-muted">Budget</dt>
+                                    <dd className="text-foreground">
+                                        {selectedLead.budget_min && selectedLead.budget_max
+                                            ? `${formatCurrency(Number(selectedLead.budget_min))} - ${formatCurrency(Number(selectedLead.budget_max))}`
+                                            : "Not specified"}
+                                    </dd>
+                                </div>
+                                <div className="flex justify-between">
+                                    <dt className="text-muted">Created</dt>
+                                    <dd className="text-foreground">{new Date(selectedLead.created_at).toLocaleDateString()}</dd>
+                                </div>
+                            </dl>
+                        </Card>
+
+                        {/* Status Update */}
+                        <Card>
+                            <h4 className="font-medium text-foreground mb-3">Update Status</h4>
+                            <div className="flex flex-wrap gap-2">
+                                {["new", "contacted", "qualified", "negotiation", "won", "lost"].map((status) => (
+                                    <button
+                                        key={status}
+                                        onClick={() => handleUpdateStatus(selectedLead, status)}
+                                        className={cn(
+                                            "px-3 py-1.5 text-sm rounded-lg border transition-colors capitalize",
+                                            selectedLead.status === status
+                                                ? "bg-brand text-white border-brand"
+                                                : "border-border text-muted hover:text-foreground hover:bg-surface-elevated"
+                                        )}
+                                    >
+                                        {status}
+                                    </button>
+                                ))}
+                            </div>
+                        </Card>
+
+                        {/* Tags */}
+                        {selectedLead.tags && selectedLead.tags.length > 0 && (
+                            <Card>
+                                <h4 className="font-medium text-foreground mb-3">Tags</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {selectedLead.tags.map((tag, i) => (
+                                        <Badge key={i} variant="brand">{tag}</Badge>
+                                    ))}
+                                </div>
+                            </Card>
+                        )}
+
+                        {/* Notes */}
+                        {selectedLead.notes && (
+                            <Card>
+                                <h4 className="font-medium text-foreground mb-3">Notes</h4>
+                                <p className="text-sm text-muted">{selectedLead.notes}</p>
+                            </Card>
+                        )}
+
+                        {/* Delete Button */}
+                        <div className="pt-4 border-t border-border">
+                            <Button
+                                variant="danger"
+                                size="sm"
+                                leftIcon={<Trash2 size={16} />}
+                                onClick={() => {
+                                    handleDeleteLead(selectedLead);
+                                }}
+                            >
+                                Delete Lead
+                            </Button>
+                        </div>
+                    </div>
                 )}
-            </AnimatePresence>
+            </SlideOver>
         </MainLayout>
     );
 }
