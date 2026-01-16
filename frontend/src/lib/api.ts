@@ -90,6 +90,12 @@ export const leadApi = {
         const response = await api.post(`/leads/${leadId}/activities`, activity);
         return response.data.data;
     },
+
+    // Get matched properties for a lead
+    getMatchedProperties: async (leadId: string) => {
+        const response = await api.get(`/leads/${leadId}/match-properties`);
+        return response.data;
+    },
 };
 
 // ============================================

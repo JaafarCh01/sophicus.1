@@ -10,6 +10,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { StatusBadge, ScoreBadge, Badge } from "@/components/ui/Badge";
 import { StatCard } from "@/components/ui/StatCard";
 import { Modal, SlideOver, ModalInput, ModalSelect, ModalTextarea, ModalButton, ModalRow } from "@/components/ui/Modal";
+import { MatchedProperties } from "@/components/leads/MatchedProperties";
 import { leadApi, type LeadFilters } from "@/lib/api";
 import { formatCurrency, formatRelativeTime, cn } from "@/lib/utils";
 import type { Lead } from "@/types";
@@ -679,6 +680,9 @@ export default function LeadsPage() {
                                 <p className="text-sm text-muted">{selectedLead.notes}</p>
                             </Card>
                         )}
+
+                        {/* AI Property Matches */}
+                        <MatchedProperties leadId={selectedLead.id} />
 
                         {/* Delete Button */}
                         <div className="pt-4 border-t border-border">

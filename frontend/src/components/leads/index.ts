@@ -1,0 +1,1 @@
+export { MatchedProperties } from "./MatchedProperties";
