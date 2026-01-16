@@ -3,28 +3,28 @@
 // ============================================
 
 // Lead Types
-export type LeadStatus = 
-  | 'new' 
-  | 'contacted' 
-  | 'qualified' 
-  | 'negotiation' 
-  | 'won' 
+export type LeadStatus =
+  | 'new'
+  | 'contacted'
+  | 'qualified'
+  | 'negotiation'
+  | 'won'
   | 'lost';
 
-export type LeadIntent = 
-  | 'investor' 
-  | 'end_buyer' 
-  | 'renter' 
+export type LeadIntent =
+  | 'investor'
+  | 'end_buyer'
+  | 'renter'
   | 'developer';
 
-export type LeadSource = 
-  | 'whatsapp' 
-  | 'instagram' 
-  | 'tiktok' 
-  | 'facebook' 
-  | 'website' 
-  | 'referral' 
-  | 'portal' 
+export type LeadSource =
+  | 'whatsapp'
+  | 'instagram'
+  | 'tiktok'
+  | 'facebook'
+  | 'website'
+  | 'referral'
+  | 'portal'
   | 'cold_outreach';
 
 export interface Lead {
@@ -69,61 +69,97 @@ export interface LeadActivity {
 }
 
 // Property Types
-export type PropertyType = 
-  | 'condo' 
-  | 'house' 
-  | 'villa' 
-  | 'penthouse' 
-  | 'land' 
-  | 'commercial';
+export type PropertyType =
+  | 'condo'
+  | 'villa'
+  | 'house'
+  | 'penthouse'
+  | 'land'
+  | 'commercial'
+  | 'hotel'
+  | 'development';
 
-export type PropertyStatus = 
-  | 'available' 
-  | 'pending' 
-  | 'sold' 
-  | 'off_market' 
-  | 'pre_launch';
+export type ListingType = 'sale' | 'rent' | 'presale';
+
+export type PropertyStatus =
+  | 'active'
+  | 'pending'
+  | 'sold'
+  | 'rented'
+  | 'off_market';
 
 export interface Property {
   id: string;
   title: string;
-  description: string;
+  slug: string;
+  description: string | null;
   property_type: PropertyType;
+  listing_type: ListingType;
   status: PropertyStatus;
   price: number;
   currency: string;
+  price_per_sqm: number | null;
+
+  // Location
+  address: string | null;
+  city: string;
+  zone: string | null;
+  state: string;
+  country: string;
+  latitude: number | null;
+  longitude: number | null;
+
+  // Specifications
   bedrooms: number | null;
   bathrooms: number | null;
-  area_sqft: number | null;
+  sqm_built: number | null;
+  sqm_land: number | null;
+  parking_spaces: number | null;
+  floor: number | null;
+  total_floors: number | null;
   year_built: number | null;
-  location: PropertyLocation;
+
+  // Features
   features: string[];
-  media: PropertyMedia[];
-  developer_id: string | null;
+  amenities: string[];
+
+  // Media
+  images: string[];
+  video_url: string | null;
+  virtual_tour_url: string | null;
+  floor_plan_url: string | null;
+
+  // Investment Info
+  expected_roi: number | null;
+  delivery_date: string | null;
+  developer: string | null;
+  construction_progress: number | null;
+
+  // Flags
+  is_featured: boolean;
+  is_exclusive: boolean;
+
+  // Relations
   agent_id: string | null;
-  roi_estimate: number | null; // Annual ROI percentage
+  agent?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+
   created_at: string;
   updated_at: string;
 }
 
-export interface PropertyLocation {
-  address: string;
-  city: string;
-  state: string;
-  country: string;
-  zip_code: string | null;
-  lat: number;
-  lng: number;
-  neighborhood: string | null;
-}
-
 export interface PropertyMedia {
   id: string;
-  type: 'image' | 'video' | 'floor_plan' | '360_tour';
+  property_id: string;
+  type: 'image' | 'video' | 'floor_plan' | 'document';
   url: string;
   thumbnail_url: string | null;
-  alt: string | null;
+  title: string | null;
   order: number;
+  is_primary: boolean;
 }
 
 // User & Auth Types
