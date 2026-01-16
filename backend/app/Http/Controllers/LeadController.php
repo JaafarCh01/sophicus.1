@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Lead;
 use App\Models\LeadActivity;
+use App\Models\Property;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
@@ -230,5 +231,148 @@ class LeadController extends Controller
         ];
 
         return response()->json(['data' => $stats]);
+    }
+
+    /**
+     * Get matched properties for a lead based on their preferences.
+     */
+    public function matchProperties(Lead $lead): JsonResponse
+    {
+        $query = Property::query()->active();
+
+        $preferences = $lead->preferences ?? [];
+
+        // Budget matching - use wider range if lead has preferences
+        if ($lead->budget_min || $lead->budget_max) {
+            if ($lead->budget_min && $lead->budget_max) {
+                // Allow 20% flexibility in budget
+                $min = $lead->budget_min * 0.8;
+                $max = $lead->budget_max * 1.2;
+                $query->whereBetween('price', [$min, $max]);
+            } elseif ($lead->budget_min) {
+                $query->where('price', '>=', $lead->budget_min * 0.8);
+            } elseif ($lead->budget_max) {
+                $query->where('price', '<=', $lead->budget_max * 1.2);
+            }
+        }
+
+        // Intent-based filtering
+        if ($lead->intent === 'investor') {
+            $query->where(function ($q) {
+                $q->where('listing_type', 'presale')
+                    ->orWhereNotNull('expected_roi');
+            });
+        } elseif ($lead->intent === 'renter') {
+            $query->where('listing_type', 'rent');
+        }
+
+        // Get properties
+        $properties = $query
+            ->with('agent:id,name')
+            ->orderBy('is_featured', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get();
+
+        // Calculate match score for each property
+        $properties = $properties->map(function ($property) use ($lead, $preferences) {
+            $score = 0;
+            $maxScore = 100;
+            $matchReasons = [];
+
+            // Budget match (30 points)
+            if ($lead->budget_min || $lead->budget_max) {
+                $withinBudget = true;
+                if ($lead->budget_min && $property->price < $lead->budget_min) {
+                    $withinBudget = false;
+                }
+                if ($lead->budget_max && $property->price > $lead->budget_max) {
+                    $withinBudget = false;
+                }
+                if ($withinBudget) {
+                    $score += 30;
+                    $matchReasons[] = 'Within budget';
+                } elseif ($lead->budget_max && $property->price <= $lead->budget_max * 1.2) {
+                    $score += 15;
+                    $matchReasons[] = 'Close to budget';
+                }
+            } else {
+                $score += 15; // Partial if no budget specified
+            }
+
+            // Bedrooms match (20 points)
+            if (!empty($preferences['bedrooms_min']) && $property->bedrooms) {
+                if ($property->bedrooms >= $preferences['bedrooms_min']) {
+                    $score += 20;
+                    $matchReasons[] = "{$property->bedrooms} bedrooms";
+                }
+            } else {
+                $score += 10;
+            }
+
+            // Property type match (20 points)
+            if (!empty($preferences['property_types']) && is_array($preferences['property_types'])) {
+                if (in_array($property->property_type, $preferences['property_types'])) {
+                    $score += 20;
+                    $matchReasons[] = ucfirst($property->property_type);
+                }
+            } else {
+                $score += 10;
+            }
+
+            // Location match (20 points)
+            if (!empty($preferences['locations']) && is_array($preferences['locations'])) {
+                foreach ($preferences['locations'] as $location) {
+                    if (
+                        stripos($property->city, $location) !== false ||
+                        stripos($property->zone ?? '', $location) !== false
+                    ) {
+                        $score += 20;
+                        $matchReasons[] = $property->city;
+                        break;
+                    }
+                }
+            } else {
+                $score += 10;
+            }
+
+            // Intent match (10 points)
+            if ($lead->intent === 'investor' && ($property->listing_type === 'presale' || $property->expected_roi)) {
+                $score += 10;
+                if ($property->expected_roi) {
+                    $matchReasons[] = "ROI: {$property->expected_roi}%";
+                }
+            } elseif ($lead->intent === 'renter' && $property->listing_type === 'rent') {
+                $score += 10;
+                $matchReasons[] = 'For rent';
+            } elseif ($lead->intent === 'end_buyer' && $property->listing_type === 'sale') {
+                $score += 10;
+                $matchReasons[] = 'For sale';
+            } else {
+                $score += 5;
+            }
+
+            if ($property->is_featured) {
+                $matchReasons[] = 'Featured';
+            }
+
+            $property->match_score = $score;
+            $property->match_reasons = $matchReasons;
+
+            return $property;
+        });
+
+        // Sort by match score
+        $properties = $properties->sortByDesc('match_score')->values();
+
+        return response()->json([
+            'data' => $properties,
+            'lead_preferences' => [
+                'budget_min' => $lead->budget_min,
+                'budget_max' => $lead->budget_max,
+                'intent' => $lead->intent,
+                'preferences' => $preferences,
+            ],
+        ]);
     }
 }
