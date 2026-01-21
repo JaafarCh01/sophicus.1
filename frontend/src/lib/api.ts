@@ -96,6 +96,30 @@ export const leadApi = {
         const response = await api.get(`/leads/${leadId}/match-properties`);
         return response.data;
     },
+
+    // Get score breakdown for a lead
+    getScoreBreakdown: async (leadId: string) => {
+        const response = await api.get(`/leads/${leadId}/score-breakdown`);
+        return response.data.data;
+    },
+
+    // Recalculate lead score
+    recalculateScore: async (leadId: string) => {
+        const response = await api.post(`/leads/${leadId}/recalculate-score`);
+        return response.data;
+    },
+
+    // Generate AI message for a lead
+    generateMessage: async (leadId: string, options: {
+        type: 'outreach' | 'follow_up' | 'property_pitch';
+        property_id?: string;
+        language?: 'english' | 'spanish';
+        tone?: 'professional' | 'friendly' | 'enthusiastic';
+        platform?: 'whatsapp' | 'email' | 'instagram';
+    }) => {
+        const response = await api.post(`/leads/${leadId}/generate-message`, options);
+        return response.data.data;
+    },
 };
 
 // ============================================
@@ -167,6 +191,38 @@ export const propertyApi = {
     // Delete a property
     deleteProperty: async (id: string): Promise<void> => {
         await api.delete(`/properties/${id}`);
+    },
+};
+
+// ============================================
+// ANALYTICS API
+// ============================================
+
+export const analyticsApi = {
+    // Get dashboard analytics
+    getDashboard: async () => {
+        const response = await api.get("/analytics/dashboard");
+        return response.data.data;
+    },
+
+    // Get lead funnel data
+    getFunnel: async () => {
+        const response = await api.get("/analytics/funnel");
+        return response.data.data;
+    },
+
+    // Get source performance
+    getSourcePerformance: async () => {
+        const response = await api.get("/analytics/sources");
+        return response.data.data;
+    },
+
+    // Get time trends
+    getTrends: async (period: "day" | "week" | "month" = "day", range: number = 30) => {
+        const response = await api.get("/analytics/trends", {
+            params: { period, range },
+        });
+        return response.data.data;
     },
 };
 
