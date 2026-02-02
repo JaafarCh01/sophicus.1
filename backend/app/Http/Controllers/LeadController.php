@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Lead;
 use App\Models\LeadActivity;
 use App\Models\Property;
+use App\Services\LeadScoringService;
+use App\Services\AIMessageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
@@ -375,4 +377,90 @@ class LeadController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Get score breakdown for a lead.
+     */
+    public function scoreBreakdown(Lead $lead, LeadScoringService $scoringService): JsonResponse
+    {
+        $breakdown = $scoringService->getScoreBreakdown($lead);
+
+        return response()->json([
+            'data' => $breakdown,
+        ]);
+    }
+
+    /**
+     * Recalculate and update a lead's score.
+     */
+    public function recalculateScore(Lead $lead, LeadScoringService $scoringService): JsonResponse
+    {
+        $oldScore = $lead->score;
+        $lead = $scoringService->updateScore($lead);
+
+        return response()->json([
+            'message' => 'Score recalculated successfully',
+            'data' => [
+                'old_score' => $oldScore,
+                'new_score' => $lead->score,
+                'change' => $lead->score - $oldScore,
+            ],
+        ]);
+    }
+
+    /**
+     * Generate an AI message for a lead.
+     */
+    public function generateMessage(Request $request, Lead $lead, AIMessageService $aiService): JsonResponse
+    {
+        $validated = $request->validate([
+            'type' => 'required|in:outreach,follow_up,property_pitch',
+            'property_id' => 'required_if:type,property_pitch|exists:properties,id',
+            'language' => 'sometimes|in:english,spanish',
+            'tone' => 'sometimes|in:professional,friendly,enthusiastic',
+            'platform' => 'sometimes|in:whatsapp,email,instagram',
+        ]);
+
+        $options = [
+            'language' => $validated['language'] ?? 'english',
+            'tone' => $validated['tone'] ?? 'professional',
+            'platform' => $validated['platform'] ?? 'whatsapp',
+        ];
+
+        $result = match ($validated['type']) {
+            'outreach' => $aiService->generateOutreach($lead, $options),
+            'follow_up' => $aiService->generateFollowUp($lead, '', $options),
+            'property_pitch' => $aiService->generatePropertyPitch(
+                $lead,
+                Property::findOrFail($validated['property_id']),
+                $options
+            ),
+            default => ['success' => false, 'error' => 'Invalid type'],
+        };
+
+        if (!$result['success']) {
+            return response()->json([
+                'message' => 'Failed to generate message',
+                'error' => $result['error'],
+            ], 422);
+        }
+
+        // Log the AI generation activity
+        LeadActivity::create([
+            'lead_id' => $lead->id,
+            'type' => 'note',
+            'title' => 'AI message generated',
+            'description' => "Generated {$validated['type']} message via AI",
+            'metadata' => [
+                'message_type' => $validated['type'],
+                'language' => $options['language'],
+                'tone' => $options['tone'],
+            ],
+        ]);
+
+        return response()->json([
+            'data' => $result,
+        ]);
+    }
 }
+
